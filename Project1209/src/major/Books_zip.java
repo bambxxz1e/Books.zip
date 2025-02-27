@@ -20,6 +20,7 @@ public class Books_zip {
     private ArrayList<Folder> folders; // Folder 객체 리스트
     private FolderTableModel tableModel;
     private JButton newFolderButton; // 독후감 작성하기 버튼을 멤버 변수로 선언
+    private JButton tagSearchButton; // 태그 검색 버튼
 
     // 생성자: Books_zip UI 초기화
     public Books_zip() {
@@ -52,6 +53,17 @@ public class Books_zip {
             }
         });
         leftPanel.add(newFolderButton);
+        
+        // "태그 검색" 버튼 추가
+        tagSearchButton = new JButton("태그 검색");
+        tagSearchButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // 태그 검색 창 열기
+                openTagSearchForm();
+            }
+        });
+        leftPanel.add(tagSearchButton);
 
         // 중앙 테이블 (폴더명 및 수정 날짜 표시)
         tableModel = new FolderTableModel(folders);
@@ -115,22 +127,121 @@ public class Books_zip {
         // 프레임 표시
         frame.setVisible(true);
     }
+    
+    // 태그 검색 창을 여는 메서드
+    private void openTagSearchForm() {
+        String tag = JOptionPane.showInputDialog(frame, "검색할 태그를 입력하세요 (예: #재밌는, #웃긴)");
 
-    public void createNewFolder(String folderName, String authorName, int rating, String reviewContent, String tags) {
+        if (tag != null && !tag.trim().isEmpty()) {
+            searchByTag(tag.trim());
+        }
+    }
+
+    // 입력된 태그로 검색해서 결과 표시
+    private void searchByTag(String tag) {
+        ArrayList<Folder> filteredFolders = new ArrayList<>();
+
+        // 태그로 필터링
+        for (Folder folder : folders) {
+            if (folder.getTagsAsString().contains(tag)) {
+                filteredFolders.add(folder);
+            }
+        }
+
+        // 검색된 결과가 있으면 새로운 창에 테이블로 표시
+        if (filteredFolders.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "해당 태그를 가진 독후감이 없습니다.");
+        } else {
+            // 새로운 창 열기
+            JFrame tagSearchFrame = new JFrame("태그 검색 결과");
+            tagSearchFrame.setSize(400, 200);
+            tagSearchFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+            // 중앙 패널
+            JPanel tagSearchPanel = new JPanel(new BorderLayout());
+
+            // 테이블 모델 설정
+            FolderTableModel tagTableModel = new FolderTableModel(filteredFolders);
+            JTable table = new JTable(tagTableModel);
+            JScrollPane tableScrollPane = new JScrollPane(table);
+            tagSearchPanel.add(tableScrollPane, BorderLayout.CENTER);
+
+            // 테이블 클릭 리스너 추가 (독후감 내용 보기)
+            addFolderClickListenerForTagSearch(table, filteredFolders);
+
+            tagSearchFrame.add(tagSearchPanel);
+            tagSearchFrame.setVisible(true);
+        }
+    }
+
+    // 태그 검색 결과 테이블의 클릭 리스너 추가
+    private void addFolderClickListenerForTagSearch(JTable table, ArrayList<Folder> filteredFolders) {
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int selectedRow = table.getSelectedRow();
+                if (selectedRow != -1) {
+                    Folder selectedFolder = filteredFolders.get(selectedRow);
+
+                    // 독후감 정보 문자열 생성
+                    String message = "도서명 : " + selectedFolder.getName() + "\n" +
+                                     "저자명 : " + selectedFolder.getAuthorName() + "\n" +
+                                     "별점 : " + getStars(selectedFolder.getRating()) + "\n" +
+                                     "작성한 날짜 : " + selectedFolder.getModifiedDate() + "\n\n" +
+                                     "내용 :\n" + selectedFolder.getReviewContent() + "\n\n" +
+                                     "태그 : " + selectedFolder.getTagsAsString();
+
+                    // 다이얼로그용 패널 생성
+                    JPanel panel = new JPanel();
+                    panel.setLayout(new BorderLayout());
+
+                    // 텍스트 정보 추가
+                    JTextArea textArea = new JTextArea(message);
+                    textArea.setEditable(false);
+                    textArea.setLineWrap(true);
+                    textArea.setWrapStyleWord(true);
+                    JScrollPane scrollPane = new JScrollPane(textArea);
+                    scrollPane.setPreferredSize(new Dimension(300, 200));
+                    panel.add(scrollPane, BorderLayout.NORTH);
+
+                    // 이미지가 있는 경우 추가
+                    if (selectedFolder.getImagePath() != null && !selectedFolder.getImagePath().isEmpty()) {
+                        File imageFile = new File(selectedFolder.getImagePath());
+                        if (imageFile.exists()) {
+                            ImageIcon icon = new ImageIcon(selectedFolder.getImagePath());
+                            Image img = icon.getImage().getScaledInstance(200, 150, Image.SCALE_SMOOTH);
+                            JLabel imageLabel = new JLabel(new ImageIcon(img));
+                            panel.add(imageLabel, BorderLayout.CENTER);
+                        }
+                    }
+
+                    // 옵션 버튼 추가
+                    int option = JOptionPane.showOptionDialog(
+                            frame, panel, "독후감 내용",
+                            JOptionPane.YES_NO_CANCEL_OPTION,
+                            JOptionPane.INFORMATION_MESSAGE,
+                            null,
+                            new String[]{"수정", "삭제", "닫기"},
+                            "닫기"
+                    );
+
+                    if (option == 0) { // 수정 버튼 클릭
+                        openEditForm(selectedFolder, selectedRow);
+                    } else if (option == 1) { // 삭제 버튼 클릭
+                        deleteFolder(selectedRow);
+                    }
+                }
+            }
+        });
+    }
+    
+    public void createNewFolder(String folderName, String authorName, int rating, String reviewContent, String tags, String imagePath) {
         Date currentTime = new Date();
-        Folder newFolder = new Folder(folderName, authorName, rating, currentTime, reviewContent, tags);
+        Folder newFolder = new Folder(folderName, authorName, rating, currentTime, reviewContent, tags, imagePath);
         folders.add(newFolder);
 
-        // 텍스트 파일에 데이터 저장
         saveReviewToFile(newFolder);
-
-        JLabel folderLabel = new JLabel(folderName);
-        folderLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        leftPanel.add(folderLabel);
-
         tableModel.fireTableDataChanged();
-        leftPanel.revalidate();
-        leftPanel.repaint();
     }
 
     private void openReviewForm() {
@@ -158,8 +269,6 @@ public class Books_zip {
     }
 
     private void refreshUI() {
-        leftPanel.removeAll();
-        leftPanel.add(newFolderButton);
 
         for (int i = 0; i < folders.size(); i++) {
             Folder folder = folders.get(i);
@@ -175,15 +284,12 @@ public class Books_zip {
                 }
             });
 
-            leftPanel.add(folderLabel);
         }
 
-        leftPanel.revalidate();
-        leftPanel.repaint();
         tableModel.fireTableDataChanged();
     }
     
-    private void showFolderDetails(int index) { //좌측패널에서도 독후감 볼 수 잇더
+    private void showFolderDetails(int index) {
         Folder selectedFolder = folders.get(index);
 
         String message = String.format(
@@ -196,14 +302,25 @@ public class Books_zip {
                 selectedFolder.getTagsAsString()
         );
 
-        int option = JOptionPane.showOptionDialog(
-                frame, message, "독후감 내용",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.INFORMATION_MESSAGE,
-                null,
-                new String[]{"수정", "삭제", "닫기"},
-                "닫기"
-        );
+        // 다이얼로그 생성
+        JOptionPane optionPane = new JOptionPane(message, JOptionPane.INFORMATION_MESSAGE, JOptionPane.YES_NO_CANCEL_OPTION,
+                null, new String[]{"수정", "삭제", "닫기"}, "닫기");
+
+        // 이미지가 있는 경우, JLabel에 추가
+        if (selectedFolder.getImagePath() != null && !selectedFolder.getImagePath().isEmpty()) {
+            File imageFile = new File(selectedFolder.getImagePath());
+            if (imageFile.exists()) {
+                ImageIcon icon = new ImageIcon(selectedFolder.getImagePath());
+                Image img = icon.getImage().getScaledInstance(200, 150, Image.SCALE_SMOOTH);
+                JLabel imageLabel = new JLabel(new ImageIcon(img));
+                optionPane.setMessage(new Object[]{message, imageLabel});
+            }
+        }
+
+        JDialog dialog = optionPane.createDialog(frame, "독후감 내용");
+        dialog.setVisible(true);
+
+        int option = (int) optionPane.getValue();
 
         if (option == 0) { // 수정 버튼 클릭
             openEditForm(selectedFolder, index);
@@ -211,6 +328,7 @@ public class Books_zip {
             deleteFolder(index);
         }
     }
+
 
     private void addFolderClickListener(JTable table) {
         table.addMouseListener(new MouseAdapter() {
@@ -220,18 +338,41 @@ public class Books_zip {
                 if (selectedRow != -1) {
                     Folder selectedFolder = folders.get(selectedRow);
 
-                    String message = String.format(
-                            "도서명: %s\n저자명: %s\n별점: %s\n작성한 날짜: %s\n\n내용:\n%s\n\n태그: %s",
-                            selectedFolder.getName(),
-                            selectedFolder.getAuthorName(),
-                            getStars(selectedFolder.getRating()),
-                            selectedFolder.getModifiedDate(),
-                            selectedFolder.getReviewContent(),
-                            selectedFolder.getTagsAsString()
-                    );
+                    // 독후감 정보 문자열 생성
+                    String message = "도서명 : " + selectedFolder.getName() + "\n" +
+                                     "저자명 : " + selectedFolder.getAuthorName() + "\n" +
+                                     "별점 : " + getStars(selectedFolder.getRating()) + "\n" +
+                                     "작성한 날짜 : " + selectedFolder.getModifiedDate() + "\n\n" +
+                                     "내용 :\n" + selectedFolder.getReviewContent() + "\n\n" +
+                                     "태그 : " + selectedFolder.getTagsAsString();
 
+                    // 다이얼로그용 패널 생성
+                    JPanel panel = new JPanel();
+                    panel.setLayout(new BorderLayout());
+
+                    // 텍스트 정보 추가
+                    JTextArea textArea = new JTextArea(message);
+                    textArea.setEditable(false);
+                    textArea.setLineWrap(true);
+                    textArea.setWrapStyleWord(true);
+                    JScrollPane scrollPane = new JScrollPane(textArea);
+                    scrollPane.setPreferredSize(new Dimension(300, 200));
+                    panel.add(scrollPane, BorderLayout.NORTH);
+
+                    // 이미지가 있는 경우 추가
+                    if (selectedFolder.getImagePath() != null && !selectedFolder.getImagePath().isEmpty()) {
+                        File imageFile = new File(selectedFolder.getImagePath());
+                        if (imageFile.exists()) {
+                            ImageIcon icon = new ImageIcon(selectedFolder.getImagePath());
+                            Image img = icon.getImage().getScaledInstance(200, 150, Image.SCALE_SMOOTH);
+                            JLabel imageLabel = new JLabel(new ImageIcon(img));
+                            panel.add(imageLabel, BorderLayout.CENTER);
+                        }
+                    }
+
+                    // 옵션 버튼 추가
                     int option = JOptionPane.showOptionDialog(
-                            frame, message, "독후감 내용",
+                            frame, panel, "독후감 내용",
                             JOptionPane.YES_NO_CANCEL_OPTION,
                             JOptionPane.INFORMATION_MESSAGE,
                             null,
@@ -248,6 +389,7 @@ public class Books_zip {
             }
         });
     }
+
 
     public void updateFolder(int index, Folder updatedFolder) {
         folders.set(index, updatedFolder); // 폴더 리스트 갱신
@@ -278,6 +420,7 @@ public class Books_zip {
                 writer.write("작성시간 : " + sdf.format(folder.getModifiedDateAsDate()) + "\n");
                 writer.write("내용 : " + folder.getReviewContent() + "\n");
                 writer.write("태그 : " + folder.getTagsAsString() + "\n");
+                writer.write("이미지 : " + (folder.getImagePath() != null ? folder.getImagePath() : "없음") + "\n");
                 writer.write("-------------------------------\n");
             }
         } catch (IOException e) {
@@ -301,9 +444,17 @@ public class Books_zip {
             writer.write("도서명 : " + folder.getName() + "\n");
             writer.write("저자명 : " + folder.getAuthorName() + "\n");
             writer.write("별점 : " + folder.getRating() + "\n");
-            writer.write("작성시간 : " + sdf.format(folder.getModifiedDateAsDate()) + "\n"); // 날짜+시간 저장
+            writer.write("작성시간 : " + sdf.format(folder.getModifiedDateAsDate()) + "\n");
             writer.write("내용 : " + folder.getReviewContent() + "\n");
             writer.write("태그 : " + folder.getTagsAsString() + "\n");
+
+            // 이미지 경로 저장
+            if (folder.getImagePath() != null && !folder.getImagePath().isEmpty()) {
+                writer.write("이미지 : " + folder.getImagePath() + "\n");
+            } else {
+                writer.write("이미지 : 없음\n");
+            }
+
             writer.write("-------------------------------\n");
         } catch (IOException e) {
             System.out.println("파일 저장 중 오류 발생: " + e.getMessage());
@@ -311,15 +462,11 @@ public class Books_zip {
         }
     }
 
-
-
     private void loadReviewsFromFile() {
-        // 시간 정보 없이 "yyyy-MM-dd" 포맷으로 날짜만 처리
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
         try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
             String line;
-            String bookName = null, authorName = null, reviewContent = null, tags = null;
+            String bookName = null, authorName = null, reviewContent = null, tags = null, imagePath = null;
             int rating = 0;
             Date modifiedDate = null;
 
@@ -332,20 +479,25 @@ public class Books_zip {
                     rating = Integer.parseInt(line.substring(5).trim());
                 } else if (line.startsWith("작성시간 : ")) {
                     String dateString = line.substring(6).trim();
-                    modifiedDate = sdf.parse(dateString); // 날짜만 파싱
+                    modifiedDate = sdf.parse(dateString);
                 } else if (line.startsWith("내용 : ")) {
                     reviewContent = line.substring(5).trim();
                 } else if (line.startsWith("태그 : ")) {
                     tags = line.substring(5).trim();
+                } else if (line.startsWith("이미지 : ")) {
+                    imagePath = line.substring(6).trim();
+                    if (imagePath.equals("없음")) {
+                        imagePath = null;
+                    }
                 } else if (line.startsWith("-------------------------------")) {
                     if (bookName != null && authorName != null && modifiedDate != null) {
-                        folders.add(new Folder(bookName, authorName, rating, modifiedDate, reviewContent, tags));
+                        folders.add(new Folder(bookName, authorName, rating, modifiedDate, reviewContent, tags, imagePath));
                     }
-                    // 초기화
                     bookName = null;
                     authorName = null;
                     reviewContent = null;
                     tags = null;
+                    imagePath = null;
                     rating = 0;
                     modifiedDate = null;
                 }
@@ -362,8 +514,6 @@ public class Books_zip {
             e.printStackTrace();
         }
     }
-
-
 
 
     public static void main(String[] args) {

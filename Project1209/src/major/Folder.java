@@ -11,14 +11,16 @@ public class Folder {
     private Date modifiedDate;
     private String reviewContent;
     private ArrayList<String> tags;
+    private String imagePath; // 이미지 경로 추가
 
-    public Folder(String name, String authorName, int rating, Date modifiedDate, String reviewContent, String tagInput) {
+    public Folder(String name, String authorName, int rating, Date modifiedDate, String reviewContent, String tagInput, String imagePath) {
         this.name = name;
         this.authorName = authorName;
         this.rating = rating;
         this.modifiedDate = modifiedDate;
         this.reviewContent = reviewContent;
         this.tags = parseTags(tagInput);
+        this.imagePath = imagePath;
     }
 
     private ArrayList<String> parseTags(String tagInput) {
@@ -62,7 +64,12 @@ public class Folder {
     public String getTagsAsString() {
         return String.join(", ", tags);
     }
- // Setter 메서드들 추가
+    
+    public String getImagePath() {
+        return imagePath; // 이미지 경로 반환
+    }
+    
+    // Setter 메서드들 추가
     public void setName(String name) {
         this.name = name;
     }
@@ -90,5 +97,9 @@ public class Folder {
     // 태그를 직접 문자열로 받는 Setter 추가
     public void setTags(String tagInput) {
         this.tags = parseTags(tagInput);
+    }
+    
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 }
